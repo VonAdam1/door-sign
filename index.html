@@ -117,6 +117,23 @@
 
                 <div v-if="computedStatus === 'flow'" class="absolute inset-0 flow-mode pointer-events-none border-[20px] border-purple-400/30"></div>
             </div>
+
+            <!-- MANUELL MENY (Kugghjul) - TILLBAKA IGEN -->
+            <div class="absolute bottom-4 right-4 z-50">
+                <button @click="showMenu = !showMenu" class="menu-trigger bg-white text-gray-900 rounded-full w-12 h-12 flex items-center justify-center shadow-lg font-bold text-xl opacity-20 hover:opacity-100 transition-opacity">
+                    <i class="fas" :class="showMenu ? 'fa-times' : 'fa-cog'"></i>
+                </button>
+
+                <div v-if="showMenu" class="absolute bottom-16 right-0 bg-white text-gray-900 p-4 rounded-lg shadow-2xl w-64 border border-gray-200">
+                    <h3 class="font-bold text-lg mb-2 border-b pb-1">Quick Menu</h3>
+                    <div class="grid grid-cols-1 gap-2">
+                        <button @click="setStatus('auto'); showMenu=false" :class="state.status === 'auto' ? 'bg-blue-600 text-white' : 'bg-gray-200'" class="p-3 rounded text-left font-bold"><i class="fas fa-robot w-6"></i> AUTO</button>
+                        <button @click="setStatus('busy'); showMenu=false" :class="state.status === 'busy' ? 'bg-red-600 text-white' : 'bg-gray-200'" class="p-3 rounded text-left font-bold"><i class="fas fa-hand-paper w-6"></i> MEETING</button>
+                        <button @click="setStatus('flow'); showMenu=false" :class="state.status === 'flow' ? 'bg-purple-600 text-white' : 'bg-gray-200'" class="p-3 rounded text-left font-bold"><i class="fas fa-brain w-6"></i> FLOW</button>
+                        <button @click="setStatus('lunch'); showMenu=false" :class="state.status === 'lunch' ? 'bg-yellow-500 text-black' : 'bg-gray-200'" class="p-3 rounded text-left font-bold"><i class="fas fa-utensils w-6"></i> LUNCH</button>
+                    </div>
+                </div>
+            </div>
         </div>
 
     </div>
@@ -149,6 +166,7 @@
         createApp({
             setup() {
                 const isAdmin = ref(false);
+                const showMenu = ref(false); // Lade till denna variabel
                 const dbConnected = ref(false);
                 const now = ref(new Date());
                 const calendarEvents = ref([]);
@@ -313,7 +331,7 @@
                 });
 
                 return { 
-                    isAdmin, state, dbConnected,
+                    isAdmin, state, dbConnected, showMenu, // Exportera showMenu
                     computedStatus, displayClasses, 
                     currentStatusText, currentDescriptionText, currentSubText, currentStatusIcon,
                     currentTime, setStatus, saveToFirebase
