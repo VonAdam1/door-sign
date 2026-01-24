@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="sv">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Digital Door Sign (Hybrid)</title>
+    <title>Digital Door Sign (Firebase)</title>
 
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -14,17 +14,23 @@
     <!-- ICAL.js -->
     <script src="https://unpkg.com/ical.js@1.5.0/build/ical.min.js"></script>
 
+    <!-- FIREBASE -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
     <style>
         @keyframes pulse-glow {
             0%, 100% { box-shadow: 0 0 20px rgba(139, 92, 246, 0.5); }
             50% { box-shadow: 0 0 60px rgba(139, 92, 246, 0.9); }
         }
+        @keyframes pulse-orange {
+            0%, 100% { background-color: #f97316; }
+            50% { background-color: #ea580c; }
+        }
         .flow-mode { animation: pulse-glow 3s infinite; }
+        .upcoming-mode { animation: pulse-orange 2s infinite; }
         body { font-family: 'Segoe UI', sans-serif; overflow: hidden; user-select: none; }
-        
-        /* Dölj menyknappen på iPad tills man rör den */
-        .menu-trigger { opacity: 0.1; transition: opacity 0.3s; }
-        .menu-trigger:hover, .menu-active { opacity: 1; }
+        .status-transition { transition: background-color 0.3s ease, color 0.3s ease; }
     </style>
 </head>
 <body class="bg-gray-900 text-white h-screen w-screen">
@@ -32,101 +38,84 @@
     <div id="app" class="h-full w-full relative">
 
         <!-- ========================================== -->
-        <!-- VY 1: FJÄRRKONTROLL (DATOR) ?mode=admin -->
+        <!-- VIEW 1: REMOTE CONTROL (COMPUTER) ?mode=admin -->
         <!-- ========================================== -->
         <div v-if="isAdmin" class="h-full w-full bg-gray-100 text-gray-900 p-8 overflow-y-auto">
             <div class="max-w-2xl mx-auto">
-                <header class="mb-8 flex justify-between items-center bg-white p-6 rounded-xl shadow-lg">
+                <header class="mb-8 flex justify-between items-center bg-white p-6 rounded-xl shadow-lg border-l-8 border-blue-600">
                     <div>
-                        <h1 class="text-3xl font-bold text-gray-800">Dörrskylt Fjärrkontroll</h1>
-                        <p class="text-sm text-gray-500">Styr iPaden härifrån</p>
+                        <h1 class="text-3xl font-bold text-gray-800">Door Sign Control</h1>
+                        <p class="text-sm text-gray-500">Firebase Realtime System</p>
                     </div>
                     <div class="text-right">
-                        <span v-if="loading" class="text-blue-600 font-bold animate-pulse">Skickar...</span>
-                        <span v-else class="text-green-600 font-bold text-xl"><i class="fas fa-wifi"></i> Online</span>
+                        <div v-if="!dbConnected" class="text-red-500 font-bold">Connecting...</div>
+                        <div v-else class="text-green-600 font-bold"><i class="fas fa-bolt"></i> Connected</div>
                     </div>
                 </header>
 
-                <!-- Stora Knappar -->
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-                    <button @click="setRemoteStatus('auto')" :class="state.manualStatus === 'auto' ? 'bg-blue-600 text-white ring-4 ring-blue-300' : 'bg-white hover:bg-gray-50'" class="p-8 rounded-xl shadow transition flex flex-col items-center justify-center h-32">
+                    <button @click="setStatus('auto')" :class="state.status === 'auto' ? 'bg-blue-600 text-white ring-4 ring-blue-300' : 'bg-white hover:bg-gray-50'" class="p-8 rounded-xl shadow transition duration-200 flex flex-col items-center justify-center h-32">
                         <i class="fas fa-robot text-4xl mb-3"></i>
-                        <span class="font-black text-xl">AUTO (Kalender)</span>
+                        <span class="font-black text-xl">AUTO</span>
                     </button>
-
-                    <button @click="setRemoteStatus('busy')" :class="state.manualStatus === 'busy' ? 'bg-red-600 text-white ring-4 ring-red-300' : 'bg-white hover:bg-gray-50'" class="p-8 rounded-xl shadow transition flex flex-col items-center justify-center h-32">
+                    <button @click="setStatus('busy')" :class="state.status === 'busy' ? 'bg-red-600 text-white ring-4 ring-red-300' : 'bg-white hover:bg-gray-50'" class="p-8 rounded-xl shadow transition duration-200 flex flex-col items-center justify-center h-32">
                         <i class="fas fa-hand-paper text-4xl mb-3"></i>
-                        <span class="font-black text-xl">MÖTE</span>
+                        <span class="font-black text-xl">MEETING</span>
                     </button>
-
-                    <button @click="setRemoteStatus('flow')" :class="state.manualStatus === 'flow' ? 'bg-purple-600 text-white ring-4 ring-purple-300' : 'bg-white hover:bg-gray-50'" class="p-8 rounded-xl shadow transition flex flex-col items-center justify-center h-32">
+                    <button @click="setStatus('flow')" :class="state.status === 'flow' ? 'bg-purple-600 text-white ring-4 ring-purple-300' : 'bg-white hover:bg-gray-50'" class="p-8 rounded-xl shadow transition duration-200 flex flex-col items-center justify-center h-32">
                         <i class="fas fa-brain text-4xl mb-3"></i>
                         <span class="font-black text-xl">FLOW</span>
                     </button>
-
-                    <button @click="setRemoteStatus('lunch')" :class="state.manualStatus === 'lunch' ? 'bg-yellow-500 text-black ring-4 ring-yellow-300' : 'bg-white hover:bg-gray-50'" class="p-8 rounded-xl shadow transition flex flex-col items-center justify-center h-32">
+                    <button @click="setStatus('lunch')" :class="state.status === 'lunch' ? 'bg-yellow-500 text-black ring-4 ring-yellow-300' : 'bg-white hover:bg-gray-50'" class="p-8 rounded-xl shadow transition duration-200 flex flex-col items-center justify-center h-32">
                         <i class="fas fa-utensils text-4xl mb-3"></i>
                         <span class="font-black text-xl">LUNCH</span>
                     </button>
                 </div>
 
-                <!-- Kalender Inställning -->
                 <div class="bg-white p-6 rounded-xl shadow">
-                    <h3 class="font-bold text-lg mb-4 text-gray-700">Kalenderlänk (iCal)</h3>
+                    <h3 class="font-bold text-lg mb-4 text-gray-700">Calendar Link (iCal)</h3>
                     <div class="flex gap-2">
-                        <input type="text" v-model="state.calendarUrl" class="flex-1 p-3 border rounded-lg bg-gray-50 font-mono text-sm" placeholder="Klistra in .ics länk...">
-                        <button @click="saveToCloud" class="bg-gray-800 text-white px-6 py-2 rounded-lg font-bold hover:bg-black">Spara</button>
+                        <input type="text" v-model="state.calendarUrl" @change="saveToFirebase" class="flex-1 p-3 border rounded-lg bg-gray-50 font-mono text-sm" placeholder="Paste .ics link here...">
+                        <button @click="saveToFirebase" class="bg-gray-800 text-white px-6 py-2 rounded-lg font-bold">Save</button>
                     </div>
-                    <p class="text-xs text-gray-400 mt-2">Dina ändringar skickas till iPaden via molnet.</p>
                 </div>
             </div>
         </div>
 
         <!-- ========================================== -->
-        <!-- VY 2: DISPLAY (IPAD) -->
+        <!-- VIEW 2: DISPLAY (IPAD) -->
         <!-- ========================================== -->
         <div v-else class="h-full w-full relative">
-            <div class="h-full flex flex-col items-center justify-center p-8 text-center relative transition-colors duration-500" :class="displayClasses">
+            <div class="h-full flex flex-col items-center justify-center p-8 text-center relative status-transition" :class="displayClasses">
                 
-                <!-- Diagnostik Ikon -->
-                <div v-if="loading" class="absolute top-4 right-4 text-white/30 text-sm animate-spin">
-                    <i class="fas fa-sync"></i>
-                </div>
+                <div class="z-10 flex flex-col items-center w-full max-w-4xl">
+                    <!-- RAD 0: IKON -->
+                    <i :class="currentStatusIcon" class="text-8xl mb-6 drop-shadow-lg opacity-90 transition-all duration-500"></i>
+                    
+                    <!-- RAD 1: RUBRIK (BUSY/FREE) -->
+                    <h1 class="font-black tracking-wider drop-shadow-md mb-2 uppercase leading-tight transition-all duration-300 text-7xl md:text-9xl">
+                        {{ currentStatusText }}
+                    </h1>
 
-                <!-- Innehåll -->
-                <div class="z-10 flex flex-col items-center">
-                    <i :class="currentStatusIcon" class="text-9xl mb-8 drop-shadow-lg opacity-90"></i>
-                    <h1 class="text-7xl md:text-9xl font-black tracking-wider drop-shadow-md mb-4 uppercase leading-tight">{{ currentStatusText }}</h1>
-                    <p v-if="currentSubText" class="text-4xl md:text-5xl font-light opacity-90 mt-4 bg-black/20 px-8 py-2 rounded-full backdrop-blur-sm">
-                        {{ currentSubText }}
-                    </p>
-                </div>
-
-                <!-- Footer -->
-                <div class="absolute bottom-8 w-full text-center opacity-70 pointer-events-none">
-                    <p class="text-2xl font-mono">{{ currentTime }}</p>
-                    <p v-if="state.manualStatus === 'auto'" class="text-xs mt-1 opacity-50">Synk om: {{ nextUpdate }}s</p>
-                </div>
-
-                <!-- Flow effekt -->
-                <div v-if="computedStatus === 'flow'" class="absolute inset-0 flow-mode pointer-events-none border-[20px] border-purple-400/30"></div>
-            </div>
-
-            <!-- Manuell Meny (Backup på iPad) -->
-            <div class="absolute bottom-4 right-4 z-50">
-                <button @click="showMenu = !showMenu" class="menu-trigger bg-white text-gray-900 rounded-full w-12 h-12 flex items-center justify-center shadow-lg font-bold text-xl" :class="{'menu-active': showMenu}">
-                    <i class="fas" :class="showMenu ? 'fa-times' : 'fa-cog'"></i>
-                </button>
-
-                <div v-if="showMenu" class="absolute bottom-16 right-0 bg-white text-gray-900 p-4 rounded-lg shadow-2xl w-64 border border-gray-200">
-                    <h3 class="font-bold text-lg mb-2 border-b pb-1">Snabbmeny (Lokal)</h3>
-                    <div class="grid grid-cols-1 gap-2">
-                        <button @click="setRemoteStatus('auto')" :class="state.manualStatus === 'auto' ? 'bg-blue-600 text-white' : 'bg-gray-200'" class="p-3 rounded text-left font-bold"><i class="fas fa-robot w-6"></i> AUTO</button>
-                        <button @click="setRemoteStatus('busy')" :class="state.manualStatus === 'busy' ? 'bg-red-600 text-white' : 'bg-gray-200'" class="p-3 rounded text-left font-bold"><i class="fas fa-hand-paper w-6"></i> MÖTE</button>
-                        <button @click="setRemoteStatus('flow')" :class="state.manualStatus === 'flow' ? 'bg-purple-600 text-white' : 'bg-gray-200'" class="p-3 rounded text-left font-bold"><i class="fas fa-brain w-6"></i> FLOW</button>
-                        <button @click="setRemoteStatus('lunch')" :class="state.manualStatus === 'lunch' ? 'bg-yellow-500 text-black' : 'bg-gray-200'" class="p-3 rounded text-left font-bold"><i class="fas fa-utensils w-6"></i> LUNCH</button>
+                    <!-- RAD 2: FÖRKLARING (Adam is in...) -->
+                    <h2 class="text-3xl md:text-5xl font-bold opacity-90 mb-6 drop-shadow-md">
+                        {{ currentDescriptionText }}
+                    </h2>
+                    
+                    <!-- RAD 3: TID/INFO (Pill) -->
+                    <div class="min-h-[4rem] flex items-center justify-center w-full">
+                        <p v-if="currentSubText" class="text-2xl md:text-4xl font-mono font-medium opacity-90 bg-black/20 px-8 py-3 rounded-full backdrop-blur-sm transition-all duration-300">
+                            {{ currentSubText }}
+                        </p>
                     </div>
                 </div>
+
+                <!-- Footer: Klocka -->
+                <div class="absolute bottom-8 w-full text-center opacity-70 pointer-events-none">
+                    <p class="text-2xl font-mono">{{ currentTime }}</p>
+                </div>
+
+                <div v-if="computedStatus === 'flow'" class="absolute inset-0 flow-mode pointer-events-none border-[20px] border-purple-400/30"></div>
             </div>
         </div>
 
@@ -135,119 +124,49 @@
     <script>
         const { createApp, ref, computed, onMounted } = Vue;
 
-        // --- KONFIGURATION ---
-        // Vi använder JsonBlob för att prata mellan dator och iPad
-        const API_URL = 'https://jsonblob.com/api/jsonBlob/019bf127-1056-7c17-9861-00d3ee8fc74f';
-        const LOCAL_STORAGE_KEY = 'doorsign_v3';
+        // =================================================================
+        // FIREBASE CONFIG
+        // =================================================================
+        const firebaseConfig = {
+            apiKey: "AIzaSyCNyXnQ_yKvfY907Lb_UjBJWDqBRXEGI9w",
+            authDomain: "doorsign-24670.firebaseapp.com",
+            projectId: "doorsign-24670",
+            storageBucket: "doorsign-24670.firebasestorage.app",
+            messagingSenderId: "667405905639",
+            appId: "1:667405905639:web:97742774ed5b1faec83c42"
+        };
+        // =================================================================
+
+        // Initialize Firebase
+        let db = null;
+        try {
+            firebase.initializeApp(firebaseConfig);
+            db = firebase.firestore();
+        } catch (e) {
+            console.error("Firebase config error", e);
+        }
 
         createApp({
             setup() {
                 const isAdmin = ref(false);
-                const showMenu = ref(false);
-                const loading = ref(false);
+                const dbConnected = ref(false);
                 const now = ref(new Date());
-                const updateTimer = ref(10); // Synka oftare nu (var 10:e sekund)
                 const calendarEvents = ref([]);
                 
-                // Grundinställning
+                // App State
                 const state = ref({
-                    manualStatus: 'auto',
+                    status: 'auto', 
                     calendarUrl: 'https://calendar.google.com/calendar/ical/adam.skold%40crispfilm.se/public/basic.ics'
                 });
 
-                // --- COMPUTED ---
-                const computedStatus = computed(() => {
-                    if (state.value.manualStatus !== 'auto') return state.value.manualStatus;
-                    const current = getCurrentEvent();
-                    return current ? 'busy' : 'free';
-                });
-
-                const displayClasses = computed(() => {
-                    switch (computedStatus.value) {
-                        case 'busy': return 'bg-red-600';
-                        case 'flow': return 'bg-purple-900';
-                        case 'lunch': return 'bg-yellow-500 text-black';
-                        case 'free': return 'bg-green-600';
-                        default: return 'bg-gray-800';
-                    }
-                });
-
-                const currentStatusText = computed(() => {
-                    if (computedStatus.value === 'busy') return 'MÖTE';
-                    if (computedStatus.value === 'flow') return 'FLOW';
-                    if (computedStatus.value === 'lunch') return 'LUNCH';
-                    if (computedStatus.value === 'free') return 'LEDIG';
-                    return '...';
-                });
-
-                const currentStatusIcon = computed(() => {
-                    if (computedStatus.value === 'busy') return 'fas fa-door-closed';
-                    if (computedStatus.value === 'flow') return 'fas fa-headphones';
-                    if (computedStatus.value === 'lunch') return 'fas fa-hamburger';
-                    if (computedStatus.value === 'free') return 'fas fa-door-open';
-                    return 'fas fa-sync fa-spin';
-                });
-
-                const currentSubText = computed(() => {
-                    if (state.value.manualStatus === 'auto') {
-                        const event = getCurrentEvent();
-                        if (event) {
-                             const summary = event.summary || 'Möte';
-                             return `${summary} till ${event.endDate.toLocaleTimeString('sv-SE', {hour:'2-digit', minute:'2-digit'})}`;
-                        }
-                        if (computedStatus.value === 'free') return 'Knacka på!';
-                    }
-                    if (computedStatus.value === 'lunch') return 'Tillbaka strax';
-                    if (computedStatus.value === 'flow') return 'Stör ej';
-                    return '';
-                });
-
-                const currentTime = computed(() => now.value.toLocaleTimeString('sv-SE', {hour:'2-digit', minute:'2-digit'}));
-                const nextUpdate = computed(() => updateTimer.value);
-
-                // --- FUNKTIONER ---
-
-                function setRemoteStatus(status) {
-                    state.value.manualStatus = status;
-                    saveToCloud(); // Skicka till molnet direkt
-                    showMenu.value = false;
-                }
-
-                // HÄMTA data (iPad gör detta ofta)
-                async function fetchFromCloud() {
-                    try {
-                        const res = await fetch(API_URL, { method: 'GET', headers: { 'Accept': 'application/json' } });
-                        if (res.ok) {
-                            const data = await res.json();
-                            // Uppdatera bara om vi fick vettig data
-                            if (data && data.manualStatus) {
-                                state.value = { ...state.value, ...data };
-                                // Spara backup lokalt ifall nätet dör
-                                localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(state.value));
-                            }
-                        }
-                    } catch (e) {
-                        console.log("Offline mode (Cloud fetch failed)");
-                    }
-                }
-
-                // SPARA data (Admin gör detta)
-                async function saveToCloud() {
-                    loading.value = true;
-                    // Spara lokalt först för direkt respons
-                    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(state.value));
-                    
-                    try {
-                        await fetch(API_URL, {
-                            method: 'PUT',
-                            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-                            body: JSON.stringify(state.value)
-                        });
-                    } catch (e) {
-                        console.error("Cloud save failed", e);
-                        alert("Kunde inte nå molnet. Är du ansluten?");
-                    }
-                    loading.value = false;
+                // --- LOGIC ---
+                
+                function getUpcomingEvent() {
+                    const t = now.value.getTime();
+                    return calendarEvents.value.find(e => {
+                        const timeUntilStart = e.startDate.getTime() - t;
+                        return timeUntilStart > 0 && timeUntilStart <= 600000;
+                    });
                 }
 
                 function getCurrentEvent() {
@@ -255,75 +174,149 @@
                     return calendarEvents.value.find(e => t >= e.startDate.getTime() && t < e.endDate.getTime());
                 }
 
-                // Kalender hämtning (samma robusta som förut)
+                const computedStatus = computed(() => {
+                    if (state.value.status !== 'auto') return state.value.status;
+                    if (getCurrentEvent()) return 'busy';
+                    if (getUpcomingEvent()) return 'upcoming';
+                    return 'free';
+                });
+
+                const displayClasses = computed(() => {
+                    switch (computedStatus.value) {
+                        case 'busy': return 'bg-red-600';
+                        case 'upcoming': return 'upcoming-mode';
+                        case 'flow': return 'bg-purple-900';
+                        case 'lunch': return 'bg-yellow-500 text-black';
+                        case 'free': return 'bg-green-600';
+                        default: return 'bg-gray-800';
+                    }
+                });
+
+                // RAD 1: RUBRIK
+                const currentStatusText = computed(() => {
+                    switch (computedStatus.value) {
+                        case 'busy': return 'BUSY';
+                        case 'upcoming': return 'SOON';
+                        case 'flow': return 'FLOW';
+                        case 'lunch': return 'LUNCH';
+                        case 'free': return 'FREE';
+                        default: return 'LOADING';
+                    }
+                });
+
+                // RAD 2: FÖRKLARING (Adam is in...)
+                const currentDescriptionText = computed(() => {
+                    if (state.value.status === 'auto') {
+                        if (computedStatus.value === 'busy') return "Adam is in a meeting";
+                        if (computedStatus.value === 'upcoming') return "Meeting starting soon";
+                        if (computedStatus.value === 'free') return "Adam is available";
+                    }
+                    if (computedStatus.value === 'busy') return "Adam is busy";
+                    if (computedStatus.value === 'lunch') return "Adam is out for lunch";
+                    if (computedStatus.value === 'flow') return "Do not disturb";
+                    return "";
+                });
+
+                // RAD 3: TID/INFO (Pill)
+                const currentSubText = computed(() => {
+                    if (state.value.status === 'auto') {
+                        const current = getCurrentEvent();
+                        if (current) {
+                             return `Ends ${current.endDate.toLocaleTimeString('en-US', {hour12: false, hour:'2-digit', minute:'2-digit'})}`;
+                        }
+                        const upcoming = getUpcomingEvent();
+                        if (upcoming) {
+                            const diffMs = upcoming.startDate.getTime() - now.value.getTime();
+                            const diffMins = Math.ceil(diffMs / 60000);
+                            return `Starts in ${diffMins} min`;
+                        }
+                        if (computedStatus.value === 'free') return 'Come on in!';
+                    }
+                    if (computedStatus.value === 'lunch') return 'Back soon';
+                    return '';
+                });
+
+                const currentStatusIcon = computed(() => {
+                    switch (computedStatus.value) {
+                        case 'busy': return 'fas fa-door-closed';
+                        case 'upcoming': return 'fas fa-clock';
+                        case 'flow': return 'fas fa-headphones';
+                        case 'lunch': return 'fas fa-hamburger';
+                        case 'free': return 'fas fa-door-open';
+                        default: return 'fas fa-sync fa-spin';
+                    }
+                });
+
+                const currentTime = computed(() => now.value.toLocaleTimeString('sv-SE', {hour:'2-digit', minute:'2-digit'}));
+
+                // --- FUNCTIONS ---
+
+                function setStatus(newStatus) {
+                    state.value.status = newStatus;
+                    saveToFirebase();
+                }
+
+                function initFirebaseListener() {
+                    if (!db) return;
+                    db.collection("doorsign").doc("settings")
+                        .onSnapshot((doc) => {
+                            if (doc.exists) {
+                                state.value = doc.data();
+                                dbConnected.value = true;
+                                if (state.value.status === 'auto') fetchCalendar();
+                            } else {
+                                saveToFirebase(); 
+                            }
+                        }, (error) => console.error("Listener error:", error));
+                }
+
+                function saveToFirebase() {
+                    if (!db) return;
+                    db.collection("doorsign").doc("settings").set(state.value)
+                        .catch((error) => alert("Save error: " + error.message));
+                }
+
                 async function fetchCalendar() {
                     if (!state.value.calendarUrl) return;
-                    
-                    // LÄGG TILL CACHE-BUSTER HÄR
-                    // Vi lägger till en slumpmässig siffra (?nocache=1234567) för att tvinga nytt försök
                     const noCacheUrl = state.value.calendarUrl + (state.value.calendarUrl.includes('?') ? '&' : '?') + 'nocache=' + Date.now();
-                    
-                    // Vi använder corsproxy.io som är stabilt för Google
                     const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(noCacheUrl)}`;
                     
                     try {
                         const res = await fetch(proxyUrl);
-                        if (!res.ok) throw new Error('Proxy error');
-                        const text = await res.text();
-                        
-                        // Validera att det är iCal
-                        if (!text.includes('BEGIN:VCALENDAR')) throw new Error('Invalid iCal data');
-
-                        const jcal = ICAL.parse(text);
-                        const comp = new ICAL.Component(jcal);
-                        const vevents = comp.getAllSubcomponents('vevent');
-                        
-                        let events = [];
-                        vevents.forEach(vevent => {
-                            const event = new ICAL.Event(vevent);
-                            const start = event.startDate.toJSDate();
-                            const end = event.endDate.toJSDate();
-                            // Spara endast framtida/pågående
-                            if (end > new Date(new Date().getTime() - 86400000)) {
-                                events.push({ summary: event.summary, startDate: start, endDate: end });
-                            }
-                        });
-                        calendarEvents.value = events;
-                    } catch (e) { console.error("Kalenderfel", e); }
+                        if (res.ok) {
+                            const text = await res.text();
+                            const jcal = ICAL.parse(text);
+                            const comp = new ICAL.Component(jcal);
+                            const vevents = comp.getAllSubcomponents('vevent');
+                            
+                            let events = [];
+                            vevents.forEach(vevent => {
+                                const event = new ICAL.Event(vevent);
+                                const start = event.startDate.toJSDate();
+                                const end = event.endDate.toJSDate();
+                                if (end > new Date()) {
+                                    events.push({ summary: event.summary, startDate: start, endDate: end });
+                                }
+                            });
+                            calendarEvents.value = events;
+                        }
+                    } catch (e) { console.log("Calendar poll..."); }
                 }
 
-                // --- START ---
-                onMounted(async () => {
+                onMounted(() => {
                     const params = new URLSearchParams(window.location.search);
                     isAdmin.value = params.get('mode') === 'admin';
-
-                    // 1. Ladda lokal backup först (för snabb start)
-                    const localData = localStorage.getItem(LOCAL_STORAGE_KEY);
-                    if (localData) state.value = { ...state.value, ...JSON.parse(localData) };
-
-                    // 2. Synka med molnet direkt
-                    await fetchFromCloud();
-                    fetchCalendar();
-
-                    // 3. Starta loopar
+                    initFirebaseListener();
                     setInterval(() => now.value = new Date(), 1000);
-                    
-                    // Synk-loop
-                    setInterval(() => {
-                        updateTimer.value--;
-                        if (updateTimer.value <= 0) {
-                            fetchFromCloud(); // Hämta kommandon från Admin
-                            if (state.value.manualStatus === 'auto') fetchCalendar(); // Hämta kalender
-                            updateTimer.value = 10; // 10 sekunder intervall
-                        }
-                    }, 1000);
+                    setInterval(() => { if (state.value.status === 'auto') fetchCalendar(); }, 60000); 
+                    fetchCalendar();
                 });
 
                 return { 
-                    isAdmin, state, showMenu, loading,
-                    computedStatus, displayClasses, currentStatusText, currentStatusIcon, currentSubText, 
-                    currentTime, nextUpdate,
-                    setRemoteStatus, saveToCloud
+                    isAdmin, state, dbConnected,
+                    computedStatus, displayClasses, 
+                    currentStatusText, currentDescriptionText, currentSubText, currentStatusIcon,
+                    currentTime, setStatus, saveToFirebase
                 };
             }
         }).mount('#app');
