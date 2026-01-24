@@ -3,136 +3,119 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Digital Door Sign (Firebase)</title>
+    <title>Door Sign PRO - Admin Control</title>
 
-    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Vue.js -->
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
-    <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- ICAL.js -->
     <script src="https://unpkg.com/ical.js@1.5.0/build/ical.min.js"></script>
 
-    <!-- FIREBASE -->
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 
     <style>
-        @keyframes pulse-glow {
-            0%, 100% { box-shadow: 0 0 20px rgba(139, 92, 246, 0.5); }
-            50% { box-shadow: 0 0 60px rgba(139, 92, 246, 0.9); }
-        }
-        @keyframes pulse-orange {
-            0%, 100% { background-color: #f97316; }
-            50% { background-color: #ea580c; }
-        }
+        @keyframes pulse-glow { 0%, 100% { box-shadow: 0 0 20px rgba(139, 92, 246, 0.5); } 50% { box-shadow: 0 0 60px rgba(139, 92, 246, 0.9); } }
+        @keyframes pulse-orange { 0%, 100% { background-color: #f97316; } 50% { background-color: #ea580c; } }
         .flow-mode { animation: pulse-glow 3s infinite; }
         .upcoming-mode { animation: pulse-orange 2s infinite; }
         body { font-family: 'Segoe UI', sans-serif; overflow: hidden; user-select: none; }
-        .status-transition { transition: background-color 0.3s ease, color 0.3s ease; }
+        .status-transition { transition: background-color 0.4s ease; }
     </style>
 </head>
 <body class="bg-gray-900 text-white h-screen w-screen">
 
     <div id="app" class="h-full w-full relative">
 
-        <!-- ========================================== -->
-        <!-- VIEW 1: REMOTE CONTROL (COMPUTER) ?mode=admin -->
-        <!-- ========================================== -->
-        <div v-if="isAdmin" class="h-full w-full bg-gray-100 text-gray-900 p-8 overflow-y-auto">
-            <div class="max-w-2xl mx-auto">
-                <header class="mb-8 flex justify-between items-center bg-white p-6 rounded-xl shadow-lg border-l-8 border-blue-600">
+        <div v-if="isAdmin" class="h-full w-full bg-slate-50 text-slate-900 p-6 overflow-y-auto">
+            <div class="max-w-4xl mx-auto">
+                <header class="mb-6 flex justify-between items-center bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
                     <div>
-                        <h1 class="text-3xl font-bold text-gray-800">Door Sign Control</h1>
-                        <p class="text-sm text-gray-500">Firebase Realtime System</p>
+                        <h1 class="text-2xl font-black text-slate-800 tracking-tight">SYSTEM CONTROL</h1>
+                        <p class="text-slate-500 font-medium">Global Overrides & Triggers</p>
                     </div>
-                    <div class="text-right">
-                        <div v-if="!dbConnected" class="text-red-500 font-bold">Connecting...</div>
-                        <div v-else class="text-green-600 font-bold"><i class="fas fa-bolt"></i> Connected</div>
+                    <div class="flex items-center gap-3 bg-slate-100 px-4 py-2 rounded-full">
+                        <div :class="dbConnected ? 'bg-green-500' : 'bg-red-500'" class="w-3 h-3 rounded-full animate-pulse"></div>
+                        <span class="text-sm font-bold uppercase tracking-widest">{{ dbConnected ? 'Live' : 'Offline' }}</span>
                     </div>
                 </header>
 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-                    <button @click="setStatus('auto')" :class="state.status === 'auto' ? 'bg-blue-600 text-white ring-4 ring-blue-300' : 'bg-white hover:bg-gray-50'" class="p-8 rounded-xl shadow transition duration-200 flex flex-col items-center justify-center h-32">
-                        <i class="fas fa-robot text-4xl mb-3"></i>
-                        <span class="font-black text-xl">AUTO</span>
-                    </button>
-                    <button @click="setStatus('busy')" :class="state.status === 'busy' ? 'bg-red-600 text-white ring-4 ring-red-300' : 'bg-white hover:bg-gray-50'" class="p-8 rounded-xl shadow transition duration-200 flex flex-col items-center justify-center h-32">
-                        <i class="fas fa-hand-paper text-4xl mb-3"></i>
-                        <span class="font-black text-xl">MEETING</span>
-                    </button>
-                    <button @click="setStatus('flow')" :class="state.status === 'flow' ? 'bg-purple-600 text-white ring-4 ring-purple-300' : 'bg-white hover:bg-gray-50'" class="p-8 rounded-xl shadow transition duration-200 flex flex-col items-center justify-center h-32">
-                        <i class="fas fa-brain text-4xl mb-3"></i>
-                        <span class="font-black text-xl">FLOW</span>
-                    </button>
-                    <button @click="setStatus('lunch')" :class="state.status === 'lunch' ? 'bg-yellow-500 text-black ring-4 ring-yellow-300' : 'bg-white hover:bg-gray-50'" class="p-8 rounded-xl shadow transition duration-200 flex flex-col items-center justify-center h-32">
-                        <i class="fas fa-utensils text-4xl mb-3"></i>
-                        <span class="font-black text-xl">LUNCH</span>
-                    </button>
-                </div>
+                <section class="mb-8">
+                    <h3 class="text-sm font-black text-slate-400 uppercase tracking-widest mb-4">Global Status Override</h3>
+                    <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+                        <button @click="setStatus('auto')" :class="state.status === 'auto' ? 'bg-blue-600 text-white shadow-lg shadow-blue-200' : 'bg-white text-slate-600'" class="p-4 rounded-xl font-bold transition-all border border-slate-200">
+                            <i class="fas fa-robot block text-xl mb-2"></i> AUTO
+                        </button>
+                        <button @click="setStatus('home')" :class="state.status === 'home' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200' : 'bg-white text-slate-600'" class="p-4 rounded-xl font-bold transition-all border border-slate-200">
+                            <i class="fas fa-house-laptop block text-xl mb-2"></i> HOME
+                        </button>
+                        <button @click="setStatus('busy')" :class="state.status === 'busy' ? 'bg-red-600 text-white shadow-lg shadow-red-200' : 'bg-white text-slate-600'" class="p-4 rounded-xl font-bold transition-all border border-slate-200">
+                            <i class="fas fa-hand-paper block text-xl mb-2"></i> BUSY
+                        </button>
+                        <button @click="setStatus('flow')" :class="state.status === 'flow' ? 'bg-purple-600 text-white shadow-lg shadow-purple-200' : 'bg-white text-slate-600'" class="p-4 rounded-xl font-bold transition-all border border-slate-200">
+                            <i class="fas fa-brain block text-xl mb-2"></i> FLOW
+                        </button>
+                        <button @click="setStatus('lunch')" :class="state.status === 'lunch' ? 'bg-orange-500 text-white shadow-lg shadow-orange-200' : 'bg-white text-slate-600'" class="p-4 rounded-xl font-bold transition-all border border-slate-200">
+                            <i class="fas fa-utensils block text-xl mb-2"></i> LUNCH
+                        </button>
+                    </div>
+                </section>
 
-                <div class="bg-white p-6 rounded-xl shadow">
-                    <h3 class="font-bold text-lg mb-4 text-gray-700">Calendar Link (iCal)</h3>
-                    <div class="flex gap-2">
-                        <input type="text" v-model="state.calendarUrl" @change="saveToFirebase" class="flex-1 p-3 border rounded-lg bg-gray-50 font-mono text-sm" placeholder="Paste .ics link here...">
-                        <button @click="saveToFirebase" class="bg-gray-800 text-white px-6 py-2 rounded-lg font-bold">Save</button>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                        <h3 class="font-black text-slate-800 mb-4 flex items-center gap-2">
+                            <i class="fas fa-bolt text-yellow-500"></i> Automation Triggers
+                        </h3>
+                        <div class="space-y-3">
+                            <button @click="triggerAction('test_notification')" class="w-full bg-slate-800 text-white p-4 rounded-xl font-bold hover:bg-slate-700 transition flex justify-between items-center">
+                                <span>Skicka Test-Notis</span>
+                                <i class="fas fa-bell"></i>
+                            </button>
+                            <button @click="triggerAction('reset_system')" class="w-full border-2 border-red-100 text-red-600 p-4 rounded-xl font-bold hover:bg-red-50 transition flex justify-between items-center">
+                                <span>Nollställ allt (Daily Reset)</span>
+                                <i class="fas fa-undo"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                        <h3 class="font-black text-slate-800 mb-4 flex items-center gap-2">
+                            <i class="fas fa-calendar text-blue-500"></i> Calendar Sync
+                        </h3>
+                        <input type="text" v-model="state.calendarUrl" @change="saveToFirebase" class="w-full p-3 border rounded-lg bg-slate-50 font-mono text-xs mb-4" placeholder="iCal URL">
+                        <div class="text-xs text-slate-400">
+                            Senaste synk: {{ currentTime }}
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- ========================================== -->
-        <!-- VIEW 2: DISPLAY (IPAD) -->
-        <!-- ========================================== -->
         <div v-else class="h-full w-full relative">
             <div class="h-full flex flex-col items-center justify-center p-8 text-center relative status-transition" :class="displayClasses">
                 
                 <div class="z-10 flex flex-col items-center w-full max-w-4xl">
-                    <!-- RAD 0: IKON -->
-                    <i :class="currentStatusIcon" class="text-8xl mb-6 drop-shadow-lg opacity-90 transition-all duration-500"></i>
+                    <i :class="currentStatusIcon" class="text-9xl mb-8 drop-shadow-2xl opacity-90 transition-all duration-700"></i>
                     
-                    <!-- RAD 1: RUBRIK (BUSY/FREE) -->
-                    <h1 class="font-black tracking-wider drop-shadow-md mb-2 uppercase leading-tight transition-all duration-300 text-7xl md:text-9xl">
+                    <h1 class="font-black tracking-tighter drop-shadow-lg mb-2 uppercase leading-none transition-all duration-300 text-8xl md:text-[12rem]">
                         {{ currentStatusText }}
                     </h1>
 
-                    <!-- RAD 2: FÖRKLARING (Adam is in...) -->
-                    <h2 class="text-3xl md:text-5xl font-bold opacity-90 mb-6 drop-shadow-md">
+                    <h2 class="text-4xl md:text-6xl font-bold opacity-80 mb-10 drop-shadow-md">
                         {{ currentDescriptionText }}
                     </h2>
                     
-                    <!-- RAD 3: TID/INFO (Pill) -->
-                    <div class="min-h-[4rem] flex items-center justify-center w-full">
-                        <p v-if="currentSubText" class="text-2xl md:text-4xl font-mono font-medium opacity-90 bg-black/20 px-8 py-3 rounded-full backdrop-blur-sm transition-all duration-300">
+                    <div class="min-h-[5rem] flex items-center justify-center w-full">
+                        <p v-if="currentSubText" class="text-3xl md:text-5xl font-mono font-bold opacity-100 bg-white/10 px-12 py-4 rounded-full backdrop-blur-md border border-white/20">
                             {{ currentSubText }}
                         </p>
                     </div>
                 </div>
 
-                <!-- Footer: Klocka -->
-                <div class="absolute bottom-8 w-full text-center opacity-70 pointer-events-none">
-                    <p class="text-2xl font-mono">{{ currentTime }}</p>
+                <div class="absolute bottom-10 w-full text-center opacity-40 pointer-events-none">
+                    <p class="text-3xl font-mono tracking-[0.5em]">{{ currentTime }}</p>
                 </div>
 
-                <div v-if="computedStatus === 'flow'" class="absolute inset-0 flow-mode pointer-events-none border-[20px] border-purple-400/30"></div>
-            </div>
-
-            <!-- MANUELL MENY (Kugghjul) - TILLBAKA IGEN -->
-            <div class="absolute bottom-4 right-4 z-50">
-                <button @click="showMenu = !showMenu" class="menu-trigger bg-white text-gray-900 rounded-full w-12 h-12 flex items-center justify-center shadow-lg font-bold text-xl opacity-20 hover:opacity-100 transition-opacity">
-                    <i class="fas" :class="showMenu ? 'fa-times' : 'fa-cog'"></i>
-                </button>
-
-                <div v-if="showMenu" class="absolute bottom-16 right-0 bg-white text-gray-900 p-4 rounded-lg shadow-2xl w-64 border border-gray-200">
-                    <h3 class="font-bold text-lg mb-2 border-b pb-1">Quick Menu</h3>
-                    <div class="grid grid-cols-1 gap-2">
-                        <button @click="setStatus('auto'); showMenu=false" :class="state.status === 'auto' ? 'bg-blue-600 text-white' : 'bg-gray-200'" class="p-3 rounded text-left font-bold"><i class="fas fa-robot w-6"></i> AUTO</button>
-                        <button @click="setStatus('busy'); showMenu=false" :class="state.status === 'busy' ? 'bg-red-600 text-white' : 'bg-gray-200'" class="p-3 rounded text-left font-bold"><i class="fas fa-hand-paper w-6"></i> MEETING</button>
-                        <button @click="setStatus('flow'); showMenu=false" :class="state.status === 'flow' ? 'bg-purple-600 text-white' : 'bg-gray-200'" class="p-3 rounded text-left font-bold"><i class="fas fa-brain w-6"></i> FLOW</button>
-                        <button @click="setStatus('lunch'); showMenu=false" :class="state.status === 'lunch' ? 'bg-yellow-500 text-black' : 'bg-gray-200'" class="p-3 rounded text-left font-bold"><i class="fas fa-utensils w-6"></i> LUNCH</button>
-                    </div>
-                </div>
+                <div v-if="computedStatus === 'flow'" class="absolute inset-0 flow-mode pointer-events-none border-[30px] border-purple-400/20"></div>
             </div>
         </div>
 
@@ -141,9 +124,6 @@
     <script>
         const { createApp, ref, computed, onMounted } = Vue;
 
-        // =================================================================
-        // FIREBASE CONFIG
-        // =================================================================
         const firebaseConfig = {
             apiKey: "AIzaSyCNyXnQ_yKvfY907Lb_UjBJWDqBRXEGI9w",
             authDomain: "doorsign-24670.firebaseapp.com",
@@ -152,190 +132,149 @@
             messagingSenderId: "667405905639",
             appId: "1:667405905639:web:97742774ed5b1faec83c42"
         };
-        // =================================================================
 
-        // Initialize Firebase
-        let db = null;
-        try {
-            firebase.initializeApp(firebaseConfig);
-            db = firebase.firestore();
-        } catch (e) {
-            console.error("Firebase config error", e);
-        }
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
 
         createApp({
             setup() {
                 const isAdmin = ref(false);
-                const showMenu = ref(false); // Lade till denna variabel
                 const dbConnected = ref(false);
                 const now = ref(new Date());
                 const calendarEvents = ref([]);
                 
-                // App State
                 const state = ref({
                     status: 'auto', 
-                    calendarUrl: 'https://calendar.google.com/calendar/ical/adam.skold%40crispfilm.se/public/basic.ics'
+                    calendarUrl: '',
+                    lastAction: '' // Används för att skicka kommandon till HA
                 });
 
-                // --- LOGIC ---
-                
-                function getUpcomingEvent() {
-                    const t = now.value.getTime();
-                    return calendarEvents.value.find(e => {
-                        const timeUntilStart = e.startDate.getTime() - t;
-                        return timeUntilStart > 0 && timeUntilStart <= 600000;
-                    });
-                }
-
-                function getCurrentEvent() {
-                    const t = now.value.getTime();
-                    return calendarEvents.value.find(e => t >= e.startDate.getTime() && t < e.endDate.getTime());
-                }
-
+                // --- LOGIK-HUVUDREGEL: HOME TRUMFAR ALLT ---
                 const computedStatus = computed(() => {
+                    // 1. Om Adam satt status till 'HOME', stanna där oavsett kalender.
+                    if (state.value.status === 'home') return 'home';
+                    
+                    // 2. Om andra manuella lägen är valda (Busy, Flow, Lunch), använd dem.
                     if (state.value.status !== 'auto') return state.value.status;
-                    if (getCurrentEvent()) return 'busy';
-                    if (getUpcomingEvent()) return 'upcoming';
+                    
+                    // 3. Om läget är 'AUTO', kolla kalendern.
+                    const t = now.value.getTime();
+                    const currentEvent = calendarEvents.value.find(e => t >= e.startDate.getTime() && t < e.endDate.getTime());
+                    if (currentEvent) return 'busy';
+
+                    const upcomingEvent = calendarEvents.value.find(e => {
+                        const timeUntil = e.startDate.getTime() - t;
+                        return timeUntil > 0 && timeUntil <= 600000;
+                    });
+                    if (upcomingEvent) return 'upcoming';
+
                     return 'free';
                 });
 
                 const displayClasses = computed(() => {
                     switch (computedStatus.value) {
+                        case 'home': return 'bg-indigo-800';
                         case 'busy': return 'bg-red-600';
                         case 'upcoming': return 'upcoming-mode';
-                        case 'flow': return 'bg-purple-900';
-                        case 'lunch': return 'bg-yellow-500 text-black';
-                        case 'free': return 'bg-green-600';
-                        default: return 'bg-gray-800';
+                        case 'flow': return 'bg-purple-950';
+                        case 'lunch': return 'bg-orange-500';
+                        case 'free': return 'bg-emerald-600';
+                        default: return 'bg-slate-900';
                     }
                 });
 
-                // RAD 1: RUBRIK
                 const currentStatusText = computed(() => {
                     switch (computedStatus.value) {
+                        case 'home': return 'HOME';
                         case 'busy': return 'BUSY';
                         case 'upcoming': return 'SOON';
-                        case 'flow': return 'FLOW';
+                        case 'flow': return 'FOCUS';
                         case 'lunch': return 'LUNCH';
                         case 'free': return 'FREE';
-                        default: return 'LOADING';
+                        default: return 'SYNC';
                     }
                 });
 
-                // RAD 2: FÖRKLARING (Adam is in...)
                 const currentDescriptionText = computed(() => {
-                    if (state.value.status === 'auto') {
-                        if (computedStatus.value === 'busy') return "Adam is in a meeting";
-                        if (computedStatus.value === 'upcoming') return "Meeting starting soon";
-                        if (computedStatus.value === 'free') return "Adam is available";
-                    }
-                    if (computedStatus.value === 'busy') return "Adam is busy";
-                    if (computedStatus.value === 'lunch') return "Adam is out for lunch";
-                    if (computedStatus.value === 'flow') return "Do not disturb";
-                    return "";
+                    if (computedStatus.value === 'home') return "Working from home";
+                    if (computedStatus.value === 'busy') return "In a meeting";
+                    if (computedStatus.value === 'upcoming') return "Meeting starts shortly";
+                    if (computedStatus.value === 'flow') return "Deep work in progress";
+                    if (computedStatus.value === 'lunch') return "Out for lunch";
+                    return "Available";
                 });
 
-                // RAD 3: TID/INFO (Pill)
                 const currentSubText = computed(() => {
-                    if (state.value.status === 'auto') {
-                        const current = getCurrentEvent();
-                        if (current) {
-                             return `Ends ${current.endDate.toLocaleTimeString('en-US', {hour12: false, hour:'2-digit', minute:'2-digit'})}`;
-                        }
-                        const upcoming = getUpcomingEvent();
-                        if (upcoming) {
-                            const diffMs = upcoming.startDate.getTime() - now.value.getTime();
-                            const diffMins = Math.ceil(diffMs / 60000);
-                            return `Starts in ${diffMins} min`;
-                        }
-                        if (computedStatus.value === 'free') return 'Come on in!';
-                    }
-                    if (computedStatus.value === 'lunch') return 'Back soon';
+                    if (computedStatus.value === 'home') return 'Online via Teams';
+                    const t = now.value.getTime();
+                    const current = calendarEvents.value.find(e => t >= e.startDate.getTime() && t < e.endDate.getTime());
+                    if (current) return `Ends ${current.endDate.toLocaleTimeString('sv-SE', {hour:'2-digit', minute:'2-digit'})}`;
                     return '';
                 });
 
                 const currentStatusIcon = computed(() => {
                     switch (computedStatus.value) {
+                        case 'home': return 'fas fa-house-laptop';
                         case 'busy': return 'fas fa-door-closed';
-                        case 'upcoming': return 'fas fa-clock';
+                        case 'upcoming': return 'fas fa-hourglass-half';
                         case 'flow': return 'fas fa-headphones';
-                        case 'lunch': return 'fas fa-hamburger';
+                        case 'lunch': return 'fas fa-utensils';
                         case 'free': return 'fas fa-door-open';
                         default: return 'fas fa-sync fa-spin';
                     }
                 });
 
-                const currentTime = computed(() => now.value.toLocaleTimeString('sv-SE', {hour:'2-digit', minute:'2-digit'}));
+                const currentTime = computed(() => now.value.toLocaleTimeString('sv-SE', {hour:'2-digit', minute:'2-digit', second:'2-digit'}));
 
-                // --- FUNCTIONS ---
+                // --- FUNKTIONER ---
 
                 function setStatus(newStatus) {
                     state.value.status = newStatus;
                     saveToFirebase();
                 }
 
-                function initFirebaseListener() {
-                    if (!db) return;
-                    db.collection("doorsign").doc("settings")
-                        .onSnapshot((doc) => {
-                            if (doc.exists) {
-                                state.value = doc.data();
-                                dbConnected.value = true;
-                                if (state.value.status === 'auto') fetchCalendar();
-                            } else {
-                                saveToFirebase(); 
-                            }
-                        }, (error) => console.error("Listener error:", error));
+                // NYTT: Skickar ett kommando som Home Assistant kan lyssna på
+                function triggerAction(actionName) {
+                    state.value.lastAction = actionName + "_" + Date.now();
+                    saveToFirebase();
+                    alert("Kommando skickat till Home Assistant: " + actionName);
                 }
 
                 function saveToFirebase() {
-                    if (!db) return;
                     db.collection("doorsign").doc("settings").set(state.value)
-                        .catch((error) => alert("Save error: " + error.message));
+                        .then(() => dbConnected.value = true)
+                        .catch(err => console.error(err));
                 }
 
                 async function fetchCalendar() {
                     if (!state.value.calendarUrl) return;
-                    const noCacheUrl = state.value.calendarUrl + (state.value.calendarUrl.includes('?') ? '&' : '?') + 'nocache=' + Date.now();
-                    const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(noCacheUrl)}`;
-                    
                     try {
+                        const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(state.value.calendarUrl + '?t=' + Date.now())}`;
                         const res = await fetch(proxyUrl);
-                        if (res.ok) {
-                            const text = await res.text();
-                            const jcal = ICAL.parse(text);
-                            const comp = new ICAL.Component(jcal);
-                            const vevents = comp.getAllSubcomponents('vevent');
-                            
-                            let events = [];
-                            vevents.forEach(vevent => {
-                                const event = new ICAL.Event(vevent);
-                                const start = event.startDate.toJSDate();
-                                const end = event.endDate.toJSDate();
-                                if (end > new Date()) {
-                                    events.push({ summary: event.summary, startDate: start, endDate: end });
-                                }
-                            });
-                            calendarEvents.value = events;
-                        }
-                    } catch (e) { console.log("Calendar poll..."); }
+                        const text = await res.text();
+                        const jcal = ICAL.parse(text);
+                        const comp = new ICAL.Component(jcal);
+                        calendarEvents.value = comp.getAllSubcomponents('vevent').map(ve => {
+                            const ev = new ICAL.Event(ve);
+                            return { summary: ev.summary, startDate: ev.startDate.toJSDate(), endDate: ev.endDate.toJSDate() };
+                        }).filter(e => e.endDate > new Date());
+                    } catch (e) { console.log("Calendar sync..."); }
                 }
 
                 onMounted(() => {
-                    const params = new URLSearchParams(window.location.search);
-                    isAdmin.value = params.get('mode') === 'admin';
-                    initFirebaseListener();
+                    isAdmin.value = new URLSearchParams(window.location.search).get('mode') === 'admin';
+                    db.collection("doorsign").doc("settings").onSnapshot(doc => {
+                        if (doc.exists) {
+                            state.value = doc.data();
+                            dbConnected.value = true;
+                            fetchCalendar();
+                        }
+                    });
                     setInterval(() => now.value = new Date(), 1000);
-                    setInterval(() => { if (state.value.status === 'auto') fetchCalendar(); }, 60000); 
-                    fetchCalendar();
+                    setInterval(fetchCalendar, 300000);
                 });
 
-                return { 
-                    isAdmin, state, dbConnected, showMenu, // Exportera showMenu
-                    computedStatus, displayClasses, 
-                    currentStatusText, currentDescriptionText, currentSubText, currentStatusIcon,
-                    currentTime, setStatus, saveToFirebase
-                };
+                return { isAdmin, state, dbConnected, computedStatus, displayClasses, currentStatusText, currentDescriptionText, currentSubText, currentStatusIcon, currentTime, setStatus, triggerAction, saveToFirebase };
             }
         }).mount('#app');
     </script>
