@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Digital Door Sign</title>
+    <title>Digital Door Sign (Hybrid)</title>
 
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -56,7 +56,7 @@
 
                     <button @click="setRemoteStatus('busy')" :class="state.manualStatus === 'busy' ? 'bg-red-600 text-white ring-4 ring-red-300' : 'bg-white hover:bg-gray-50'" class="p-8 rounded-xl shadow transition flex flex-col items-center justify-center h-32">
                         <i class="fas fa-hand-paper text-4xl mb-3"></i>
-                        <span class="font-black text-xl">UPPTAGEN</span>
+                        <span class="font-black text-xl">MÖTE</span>
                     </button>
 
                     <button @click="setRemoteStatus('flow')" :class="state.manualStatus === 'flow' ? 'bg-purple-600 text-white ring-4 ring-purple-300' : 'bg-white hover:bg-gray-50'" class="p-8 rounded-xl shadow transition flex flex-col items-center justify-center h-32">
@@ -122,7 +122,7 @@
                     <h3 class="font-bold text-lg mb-2 border-b pb-1">Snabbmeny (Lokal)</h3>
                     <div class="grid grid-cols-1 gap-2">
                         <button @click="setRemoteStatus('auto')" :class="state.manualStatus === 'auto' ? 'bg-blue-600 text-white' : 'bg-gray-200'" class="p-3 rounded text-left font-bold"><i class="fas fa-robot w-6"></i> AUTO</button>
-                        <button @click="setRemoteStatus('busy')" :class="state.manualStatus === 'busy' ? 'bg-red-600 text-white' : 'bg-gray-200'" class="p-3 rounded text-left font-bold"><i class="fas fa-hand-paper w-6"></i> UPPTAGEN</button>
+                        <button @click="setRemoteStatus('busy')" :class="state.manualStatus === 'busy' ? 'bg-red-600 text-white' : 'bg-gray-200'" class="p-3 rounded text-left font-bold"><i class="fas fa-hand-paper w-6"></i> MÖTE</button>
                         <button @click="setRemoteStatus('flow')" :class="state.manualStatus === 'flow' ? 'bg-purple-600 text-white' : 'bg-gray-200'" class="p-3 rounded text-left font-bold"><i class="fas fa-brain w-6"></i> FLOW</button>
                         <button @click="setRemoteStatus('lunch')" :class="state.manualStatus === 'lunch' ? 'bg-yellow-500 text-black' : 'bg-gray-200'" class="p-3 rounded text-left font-bold"><i class="fas fa-utensils w-6"></i> LUNCH</button>
                     </div>
@@ -173,7 +173,7 @@
                 });
 
                 const currentStatusText = computed(() => {
-                    if (computedStatus.value === 'busy') return 'UPPTAGEN';
+                    if (computedStatus.value === 'busy') return 'MÖTE';
                     if (computedStatus.value === 'flow') return 'FLOW';
                     if (computedStatus.value === 'lunch') return 'LUNCH';
                     if (computedStatus.value === 'free') return 'LEDIG';
@@ -192,7 +192,7 @@
                     if (state.value.manualStatus === 'auto') {
                         const event = getCurrentEvent();
                         if (event) {
-                             const summary = event.summary || 'Upptagen';
+                             const summary = event.summary || 'Möte';
                              return `${summary} till ${event.endDate.toLocaleTimeString('sv-SE', {hour:'2-digit', minute:'2-digit'})}`;
                         }
                         if (computedStatus.value === 'free') return 'Knacka på!';
@@ -258,8 +258,14 @@
                 // Kalender hämtning (samma robusta som förut)
                 async function fetchCalendar() {
                     if (!state.value.calendarUrl) return;
+                    
+                    // LÄGG TILL CACHE-BUSTER HÄR
+                    // Vi lägger till en slumpmässig siffra (?nocache=1234567) för att tvinga nytt försök
+                    const noCacheUrl = state.value.calendarUrl + (state.value.calendarUrl.includes('?') ? '&' : '?') + 'nocache=' + Date.now();
+                    
                     // Vi använder corsproxy.io som är stabilt för Google
-                    const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(state.value.calendarUrl)}`;
+                    const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(noCacheUrl)}`;
+                    
                     try {
                         const res = await fetch(proxyUrl);
                         if (!res.ok) throw new Error('Proxy error');
