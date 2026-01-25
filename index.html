@@ -16,8 +16,14 @@
     <style>
         @keyframes pulse-glow { 0%, 100% { box-shadow: 0 0 20px rgba(139, 92, 246, 0.5); } 50% { box-shadow: 0 0 60px rgba(139, 92, 246, 0.9); } }
         @keyframes pulse-orange { 0%, 100% { background-color: #f97316; } 50% { background-color: #ea580c; } }
+        @keyframes party-mode { 0% { background-color: #db2777; } 50% { background-color: #9333ea; } 100% { background-color: #db2777; } }
+        @keyframes ocean-breeze { 0% { background-color: #0891b2; } 50% { background-color: #0d9488; } 100% { background-color: #0891b2; } }
+        
         .flow-mode { animation: pulse-glow 3s infinite; }
         .upcoming-mode { animation: pulse-orange 2s infinite; }
+        .weekend-bg { animation: party-mode 10s infinite; }
+        .vacation-bg { animation: ocean-breeze 8s infinite; }
+        
         body { font-family: 'Segoe UI', sans-serif; overflow: hidden; user-select: none; }
         .status-transition { transition: background-color 0.4s ease; }
     </style>
@@ -41,7 +47,7 @@
 
                 <section class="mb-8">
                     <h3 class="text-sm font-black text-slate-400 uppercase tracking-widest mb-4">Global Status Override</h3>
-                    <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+                    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
                         <button @click="setStatus('auto')" :class="state.status === 'auto' ? 'bg-blue-600 text-white shadow-lg shadow-blue-200' : 'bg-white text-slate-600'" class="p-4 rounded-xl font-bold transition-all border border-slate-200">
                             <i class="fas fa-robot block text-xl mb-2"></i> AUTO
                         </button>
@@ -56,6 +62,9 @@
                         </button>
                         <button @click="setStatus('lunch')" :class="state.status === 'lunch' ? 'bg-orange-500 text-white shadow-lg shadow-orange-200' : 'bg-white text-slate-600'" class="p-4 rounded-xl font-bold transition-all border border-slate-200">
                             <i class="fas fa-utensils block text-xl mb-2"></i> LUNCH
+                        </button>
+                        <button @click="setStatus('vacation')" :class="state.status === 'vacation' ? 'bg-teal-600 text-white shadow-lg shadow-teal-200' : 'bg-white text-slate-600'" class="p-4 rounded-xl font-bold transition-all border border-slate-200">
+                            <i class="fas fa-plane block text-xl mb-2"></i> VACATION
                         </button>
                     </div>
                 </section>
@@ -96,7 +105,7 @@
                 <div class="z-10 flex flex-col items-center w-full max-w-4xl">
                     <i :class="currentStatusIcon" class="text-9xl mb-8 drop-shadow-2xl opacity-90 transition-all duration-700"></i>
                     
-                    <h1 class="font-black tracking-tighter drop-shadow-lg mb-2 uppercase leading-none transition-all duration-300 text-8xl md:text-[12rem]">
+                    <h1 class="font-black tracking-tighter drop-shadow-lg mb-2 uppercase leading-none transition-all duration-300 text-8xl md:text-[10rem]">
                         {{ currentStatusText }}
                     </h1>
 
@@ -146,18 +155,19 @@
                 const state = ref({
                     status: 'auto', 
                     calendarUrl: '',
-                    lastAction: '' // Används för att skicka kommandon till HA
+                    lastAction: ''
                 });
 
-                // --- LOGIK-HUVUDREGEL: HOME TRUMFAR ALLT ---
                 const computedStatus = computed(() => {
-                    // 1. Om Adam satt status till 'HOME', stanna där oavsett kalender.
-                    if (state.value.status === 'home') return 'home';
-                    
-                    // 2. Om andra manuella lägen är valda (Busy, Flow, Lunch), använd dem.
+                    // 1. Manuella lägen trumfar allt (inklusive Helg)
+                    // Här fångas 'vacation', 'home', 'busy' etc.
                     if (state.value.status !== 'auto') return state.value.status;
                     
-                    // 3. Om läget är 'AUTO', kolla kalendern.
+                    // 2. HELG-KOLL (Endast om status är AUTO)
+                    const day = now.value.getDay();
+                    if (day === 0 || day === 6) return 'weekend';
+
+                    // 3. Kalender-koll (Vardagar)
                     const t = now.value.getTime();
                     const currentEvent = calendarEvents.value.find(e => t >= e.startDate.getTime() && t < e.endDate.getTime());
                     if (currentEvent) return 'busy';
@@ -179,6 +189,8 @@
                         case 'flow': return 'bg-purple-950';
                         case 'lunch': return 'bg-orange-500';
                         case 'free': return 'bg-emerald-600';
+                        case 'weekend': return 'weekend-bg';
+                        case 'vacation': return 'vacation-bg'; // Vår nya havsbris-färg
                         default: return 'bg-slate-900';
                     }
                 });
@@ -191,6 +203,8 @@
                         case 'flow': return 'FOCUS';
                         case 'lunch': return 'LUNCH';
                         case 'free': return 'FREE';
+                        case 'weekend': return 'WEEKEND';
+                        case 'vacation': return 'SEMESTER'; // Visas på skärmen
                         default: return 'SYNC';
                     }
                 });
@@ -201,11 +215,16 @@
                     if (computedStatus.value === 'upcoming') return "Meeting starts shortly";
                     if (computedStatus.value === 'flow') return "Deep work in progress";
                     if (computedStatus.value === 'lunch') return "Out for lunch";
+                    if (computedStatus.value === 'weekend') return "What are you doing here?";
+                    if (computedStatus.value === 'vacation') return "Ur tjänst / Off Duty"; // Beskrivning
                     return "Available";
                 });
 
                 const currentSubText = computed(() => {
                     if (computedStatus.value === 'home') return 'Online via Teams';
+                    if (computedStatus.value === 'weekend') return 'Go home!';
+                    if (computedStatus.value === 'vacation') return 'Don\'t call me'; // Underrubrik
+                    
                     const t = now.value.getTime();
                     const current = calendarEvents.value.find(e => t >= e.startDate.getTime() && t < e.endDate.getTime());
                     if (current) return `Ends ${current.endDate.toLocaleTimeString('sv-SE', {hour:'2-digit', minute:'2-digit'})}`;
@@ -220,20 +239,19 @@
                         case 'flow': return 'fas fa-headphones';
                         case 'lunch': return 'fas fa-utensils';
                         case 'free': return 'fas fa-door-open';
+                        case 'weekend': return 'fas fa-glass-cheers';
+                        case 'vacation': return 'fas fa-umbrella-beach'; // Semester-ikon
                         default: return 'fas fa-sync fa-spin';
                     }
                 });
 
                 const currentTime = computed(() => now.value.toLocaleTimeString('sv-SE', {hour:'2-digit', minute:'2-digit', second:'2-digit'}));
 
-                // --- FUNKTIONER ---
-
                 function setStatus(newStatus) {
                     state.value.status = newStatus;
                     saveToFirebase();
                 }
 
-                // NYTT: Skickar ett kommando som Home Assistant kan lyssna på
                 function triggerAction(actionName) {
                     state.value.lastAction = actionName + "_" + Date.now();
                     saveToFirebase();
