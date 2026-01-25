@@ -18,11 +18,13 @@
         @keyframes pulse-orange { 0%, 100% { background-color: #f97316; } 50% { background-color: #ea580c; } }
         @keyframes party-mode { 0% { background-color: #db2777; } 50% { background-color: #9333ea; } 100% { background-color: #db2777; } }
         @keyframes ocean-breeze { 0% { background-color: #0891b2; } 50% { background-color: #0d9488; } 100% { background-color: #0891b2; } }
+        @keyframes fever-pulse { 0% { background-color: #65a30d; } 50% { background-color: #3f6212; } 100% { background-color: #65a30d; } }
         
         .flow-mode { animation: pulse-glow 3s infinite; }
         .upcoming-mode { animation: pulse-orange 2s infinite; }
         .weekend-bg { animation: party-mode 10s infinite; }
         .vacation-bg { animation: ocean-breeze 8s infinite; }
+        .sick-bg { animation: fever-pulse 4s infinite; } /* Långsam, febrig puls */
         
         body { font-family: 'Segoe UI', sans-serif; overflow: hidden; user-select: none; }
         .status-transition { transition: background-color 0.4s ease; }
@@ -47,7 +49,7 @@
 
                 <section class="mb-8">
                     <h3 class="text-sm font-black text-slate-400 uppercase tracking-widest mb-4">Global Status Override</h3>
-                    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                    <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
                         <button @click="setStatus('auto')" :class="state.status === 'auto' ? 'bg-blue-600 text-white shadow-lg shadow-blue-200' : 'bg-white text-slate-600'" class="p-4 rounded-xl font-bold transition-all border border-slate-200">
                             <i class="fas fa-robot block text-xl mb-2"></i> AUTO
                         </button>
@@ -65,6 +67,9 @@
                         </button>
                         <button @click="setStatus('vacation')" :class="state.status === 'vacation' ? 'bg-teal-600 text-white shadow-lg shadow-teal-200' : 'bg-white text-slate-600'" class="p-4 rounded-xl font-bold transition-all border border-slate-200">
                             <i class="fas fa-plane block text-xl mb-2"></i> VACATION
+                        </button>
+                        <button @click="setStatus('sick')" :class="state.status === 'sick' ? 'bg-lime-600 text-white shadow-lg shadow-lime-200' : 'bg-white text-slate-600'" class="p-4 rounded-xl font-bold transition-all border border-slate-200">
+                            <i class="fas fa-thermometer-three-quarters block text-xl mb-2"></i> SICK
                         </button>
                     </div>
                 </section>
@@ -159,11 +164,10 @@
                 });
 
                 const computedStatus = computed(() => {
-                    // 1. Manuella lägen trumfar allt (inklusive Helg)
-                    // Här fångas 'vacation', 'home', 'busy' etc.
+                    // 1. Manuella lägen trumfar allt (Inklusive SICK)
                     if (state.value.status !== 'auto') return state.value.status;
                     
-                    // 2. HELG-KOLL (Endast om status är AUTO)
+                    // 2. HELG-KOLL
                     const day = now.value.getDay();
                     if (day === 0 || day === 6) return 'weekend';
 
@@ -190,7 +194,8 @@
                         case 'lunch': return 'bg-orange-500';
                         case 'free': return 'bg-emerald-600';
                         case 'weekend': return 'weekend-bg';
-                        case 'vacation': return 'vacation-bg'; // Vår nya havsbris-färg
+                        case 'vacation': return 'vacation-bg';
+                        case 'sick': return 'sick-bg'; // Vår nya lime-färg
                         default: return 'bg-slate-900';
                     }
                 });
@@ -204,7 +209,8 @@
                         case 'lunch': return 'LUNCH';
                         case 'free': return 'FREE';
                         case 'weekend': return 'WEEKEND';
-                        case 'vacation': return 'SEMESTER'; // Visas på skärmen
+                        case 'vacation': return 'SEMESTER';
+                        case 'sick': return 'SICK'; // Text på skärmen
                         default: return 'SYNC';
                     }
                 });
@@ -216,14 +222,16 @@
                     if (computedStatus.value === 'flow') return "Deep work in progress";
                     if (computedStatus.value === 'lunch') return "Out for lunch";
                     if (computedStatus.value === 'weekend') return "What are you doing here?";
-                    if (computedStatus.value === 'vacation') return "Ur tjänst / Off Duty"; // Beskrivning
+                    if (computedStatus.value === 'vacation') return "Ur tjänst / Off Duty";
+                    if (computedStatus.value === 'sick') return "Out sick / VAB"; // Beskrivning
                     return "Available";
                 });
 
                 const currentSubText = computed(() => {
-                    if (computedStatus.value === 'home') return 'Online via Teams';
+                    if (computedStatus.value === 'home') return 'Available on ClickUp & Mail.';
                     if (computedStatus.value === 'weekend') return 'Go home!';
-                    if (computedStatus.value === 'vacation') return 'Don\'t call me'; // Underrubrik
+                    if (computedStatus.value === 'vacation') return 'I\m enjoying Pina Coladas ATM'';
+                    if (computedStatus.value === 'sick') return 'Resting / Vilar'; // Underrubrik
                     
                     const t = now.value.getTime();
                     const current = calendarEvents.value.find(e => t >= e.startDate.getTime() && t < e.endDate.getTime());
@@ -240,7 +248,8 @@
                         case 'lunch': return 'fas fa-utensils';
                         case 'free': return 'fas fa-door-open';
                         case 'weekend': return 'fas fa-glass-cheers';
-                        case 'vacation': return 'fas fa-umbrella-beach'; // Semester-ikon
+                        case 'vacation': return 'fas fa-umbrella-beach';
+                        case 'sick': return 'fas fa-thermometer-three-quarters'; // Febertermometer
                         default: return 'fas fa-sync fa-spin';
                     }
                 });
