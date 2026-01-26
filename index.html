@@ -295,7 +295,7 @@
                         }
                     });
                     setInterval(() => now.value = new Date(), 1000);
-                    setInterval(fetchCalendar, 300000);
+                    setInterval(fetchCalendar, 1000);
                 });
 
                 return { isAdmin, state, dbConnected, computedStatus, displayClasses, currentStatusText, currentDescriptionText, currentSubText, currentStatusIcon, currentTime, setStatus, triggerAction, saveToFirebase };
