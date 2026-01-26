@@ -1,9 +1,14 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="sv">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Door Sign PRO - Admin Control</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Door Sign">
+    
+    <title>Door Sign PRO</title>
 
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
@@ -26,17 +31,23 @@
         .vacation-bg { animation: ocean-breeze 8s infinite; }
         .sick-bg { animation: fever-pulse 4s infinite; }
         
-        body { font-family: 'Segoe UI', sans-serif; overflow: hidden; user-select: none; }
-        .status-transition { transition: background-color 0.4s ease; }
+        /* Förhindra markering av text och gummiband-effekt på iOS */
+        body { 
+            font-family: 'Segoe UI', sans-serif; 
+            overflow: hidden; 
+            user-select: none; 
+            -webkit-user-select: none;
+            touch-action: manipulation;
+        }
+        .status-transition { transition: background-color 0.4s ease, color 0.4s ease; }
     </style>
 </head>
-<body class="bg-gray-900 text-white h-screen w-screen">
+<body class="bg-gray-900 text-white h-screen w-screen overflow-hidden">
 
     <div id="app" class="h-full w-full relative">
 
         <div v-if="isAdmin" class="h-full w-full bg-slate-50 text-slate-900 p-6 overflow-y-auto">
-            <div class="max-w-4xl mx-auto">
-                <header class="mb-6 flex justify-between items-center bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+            <div class="max-w-4xl mx-auto pb-20"> <header class="mb-6 flex justify-between items-center bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
                     <div>
                         <h1 class="text-2xl font-black text-slate-800 tracking-tight">SYSTEM CONTROL</h1>
                         <p class="text-slate-500 font-medium">Global Overrides & Triggers</p>
@@ -101,35 +112,61 @@
                         </div>
                     </div>
                 </div>
+
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 mt-6">
+                    <h3 class="font-black text-slate-800 mb-4 flex items-center gap-2">
+                        <i class="fas fa-moon text-indigo-500"></i> Nattläge (Dark Mode)
+                    </h3>
+                    <div class="flex gap-4">
+                        <div class="w-1/2">
+                            <label class="text-xs font-bold text-slate-400 uppercase">Startar</label>
+                            <input type="time" v-model="state.darkModeStart" @change="saveToFirebase" class="w-full p-3 border rounded-lg bg-slate-50 font-mono">
+                        </div>
+                        <div class="w-1/2">
+                            <label class="text-xs font-bold text-slate-400 uppercase">Slutar</label>
+                            <input type="time" v-model="state.darkModeEnd" @change="saveToFirebase" class="w-full p-3 border rounded-lg bg-slate-50 font-mono">
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
-        <div v-else class="h-full w-full relative">
-            <div class="h-full flex flex-col items-center justify-center p-8 text-center relative status-transition" :class="displayClasses">
+        <div v-else class="h-full w-full relative overflow-hidden" @click="activateWakeLock">
+            <div class="h-full flex flex-col items-center justify-center p-4 text-center relative status-transition" :class="displayClasses">
                 
-                <div class="z-10 flex flex-col items-center w-full max-w-4xl">
-                    <i :class="currentStatusIcon" class="text-9xl mb-8 drop-shadow-2xl opacity-90 transition-all duration-700"></i>
+                <div v-if="weather" class="absolute top-6 right-6 z-50 flex flex-col items-end opacity-90 drop-shadow-md transition-opacity duration-1000">
+                    <div class="flex items-center gap-3">
+                        <span class="text-3xl md:text-5xl font-bold">{{ Math.round(weather.temperature) }}°</span>
+                        <i :class="weatherIcon" class="text-3xl md:text-5xl"></i>
+                    </div>
+                    <span class="text-xs md:text-sm font-medium opacity-70 mt-1 uppercase tracking-widest">Odenplan</span>
+                </div>
+
+                <div class="z-10 flex flex-col items-center w-full max-w-6xl justify-center flex-grow">
+                    <i :class="currentStatusIcon" class="text-[25vw] md:text-[15vw] mb-4 md:mb-8 drop-shadow-2xl opacity-90 transition-all duration-700"></i>
                     
-                    <h1 class="font-black tracking-tighter drop-shadow-lg mb-2 uppercase leading-none transition-all duration-300 text-8xl md:text-[10rem]">
+                    <h1 class="font-black tracking-tighter drop-shadow-lg mb-2 uppercase leading-none transition-all duration-300 text-[22vw] md:text-[16vw]">
                         {{ currentStatusText }}
                     </h1>
 
-                    <h2 class="text-4xl md:text-6xl font-bold opacity-80 mb-10 drop-shadow-md">
+                    <h2 class="text-2xl md:text-5xl font-bold opacity-80 mb-8 drop-shadow-md px-4">
                         {{ currentDescriptionText }}
                     </h2>
                     
-                    <div class="min-h-[5rem] flex items-center justify-center w-full">
-                        <p v-if="currentSubText" class="text-3xl md:text-5xl font-mono font-bold opacity-100 bg-white/10 px-12 py-4 rounded-full backdrop-blur-md border border-white/20">
+                    <div class="min-h-[4rem] flex items-center justify-center w-full">
+                        <p v-if="currentSubText" class="text-xl md:text-4xl font-mono font-bold opacity-100 bg-white/10 px-8 py-3 rounded-full backdrop-blur-md border border-white/20">
                             {{ currentSubText }}
                         </p>
                     </div>
                 </div>
 
-                <div class="absolute bottom-10 w-full text-center opacity-40 pointer-events-none">
-                    <p class="text-3xl font-mono tracking-[0.5em]">{{ currentTime }}</p>
+                <div class="absolute bottom-6 w-full text-center opacity-40 pointer-events-none">
+                    <p class="text-xl md:text-3xl font-mono tracking-[0.5em]">{{ currentTime }}</p>
                 </div>
 
-                <div v-if="computedStatus === 'flow'" class="absolute inset-0 flow-mode pointer-events-none border-[30px] border-purple-400/20"></div>
+                <div v-if="!wakeLockActive" class="absolute top-0 left-0 w-full h-full z-[100] cursor-pointer" @click="activateWakeLock" title="Klicka för att aktivera helskärmsläge"></div>
+
+                <div v-if="computedStatus === 'flow' && !isDarkModeActive" class="absolute inset-0 flow-mode pointer-events-none border-[20px] md:border-[30px] border-purple-400/20"></div>
             </div>
         </div>
 
@@ -156,33 +193,86 @@
                 const dbConnected = ref(false);
                 const now = ref(new Date());
                 const calendarEvents = ref([]);
+                const weather = ref(null);
+                const wakeLockActive = ref(false);
                 
                 const state = ref({
                     status: 'auto', 
                     calendarUrl: '',
-                    lastAction: ''
+                    lastAction: '',
+                    darkModeStart: '22:00',
+                    darkModeEnd: '06:00'
+                });
+
+                // --- WAKE LOCK LOGIC (Håll skärmen tänd) ---
+                async function activateWakeLock() {
+                    if ('wakeLock' in navigator) {
+                        try {
+                            const lock = await navigator.wakeLock.request('screen');
+                            wakeLockActive.value = true;
+                            console.log("Wake Lock is active!");
+                            lock.addEventListener('release', () => {
+                                wakeLockActive.value = false;
+                                console.log('Wake Lock released');
+                            });
+                        } catch (err) {
+                            console.error(`${err.name}, ${err.message}`);
+                        }
+                    }
+                }
+
+                // --- VÄDER ---
+                const weatherIcon = computed(() => {
+                    if (!weather.value) return 'fas fa-cloud';
+                    const code = weather.value.weathercode;
+                    if (code <= 1) return 'fas fa-sun';
+                    if (code <= 3) return 'fas fa-cloud-sun';
+                    if (code <= 48) return 'fas fa-smog';
+                    if (code <= 67) return 'fas fa-cloud-rain';
+                    if (code <= 77) return 'fas fa-snowflake';
+                    if (code <= 82) return 'fas fa-cloud-showers-heavy';
+                    if (code <= 99) return 'fas fa-bolt';
+                    return 'fas fa-cloud';
+                });
+
+                async function fetchWeather() {
+                    try {
+                        const res = await fetch('https://api.open-meteo.com/v1/forecast?latitude=59.3426&longitude=18.0549&current_weather=true');
+                        const data = await res.json();
+                        weather.value = data.current_weather;
+                    } catch (e) { console.log("Väder kunde inte hämtas"); }
+                }
+
+                // --- NATT-LÄGE ---
+                const isDarkModeActive = computed(() => {
+                    if (!state.value.darkModeStart || !state.value.darkModeEnd) return false;
+                    const nowMinutes = now.value.getHours() * 60 + now.value.getMinutes();
+                    const [sh, sm] = state.value.darkModeStart.split(':').map(Number);
+                    const startMinutes = sh * 60 + sm;
+                    const [eh, em] = state.value.darkModeEnd.split(':').map(Number);
+                    const endMinutes = eh * 60 + em;
+
+                    if (startMinutes < endMinutes) return nowMinutes >= startMinutes && nowMinutes < endMinutes;
+                    else return nowMinutes >= startMinutes || nowMinutes < endMinutes;
                 });
 
                 const computedStatus = computed(() => {
                     if (state.value.status !== 'auto') return state.value.status;
-                    
                     const day = now.value.getDay();
                     if (day === 0 || day === 6) return 'weekend';
-
                     const t = now.value.getTime();
                     const currentEvent = calendarEvents.value.find(e => t >= e.startDate.getTime() && t < e.endDate.getTime());
                     if (currentEvent) return 'busy';
-
                     const upcomingEvent = calendarEvents.value.find(e => {
                         const timeUntil = e.startDate.getTime() - t;
                         return timeUntil > 0 && timeUntil <= 600000;
                     });
                     if (upcomingEvent) return 'upcoming';
-
                     return 'free';
                 });
 
                 const displayClasses = computed(() => {
+                    if (isDarkModeActive.value) return 'bg-black text-gray-400';
                     switch (computedStatus.value) {
                         case 'home': return 'bg-indigo-800';
                         case 'busy': return 'bg-red-600';
@@ -198,6 +288,7 @@
                 });
 
                 const currentStatusText = computed(() => {
+                    if (isDarkModeActive.value) return 'ZZZ...';
                     switch (computedStatus.value) {
                         case 'home': return 'HOME';
                         case 'busy': return 'BUSY';
@@ -213,6 +304,7 @@
                 });
 
                 const currentDescriptionText = computed(() => {
+                    if (isDarkModeActive.value) return 'Sov gott';
                     if (computedStatus.value === 'home') return "I'm Working from home";
                     if (computedStatus.value === 'busy') return "I'm in a meeting";
                     if (computedStatus.value === 'upcoming') return "Meeting starts shortly";
@@ -225,11 +317,11 @@
                 });
 
                 const currentSubText = computed(() => {
+                    if (isDarkModeActive.value) return '';
                     if (computedStatus.value === 'home') return 'Available on ClickUp & Mail';
                     if (computedStatus.value === 'weekend') return 'Go home!';
                     if (computedStatus.value === 'vacation') return "Don't call me";
                     if (computedStatus.value === 'sick') return 'Trying to rest';
-                    
                     const t = now.value.getTime();
                     const current = calendarEvents.value.find(e => t >= e.startDate.getTime() && t < e.endDate.getTime());
                     if (current) return `Ends ${current.endDate.toLocaleTimeString('sv-SE', {hour:'2-digit', minute:'2-digit'})}`;
@@ -237,6 +329,7 @@
                 });
 
                 const currentStatusIcon = computed(() => {
+                    if (isDarkModeActive.value) return 'fas fa-moon';
                     switch (computedStatus.value) {
                         case 'home': return 'fas fa-house-laptop';
                         case 'busy': return 'fas fa-door-closed';
@@ -287,18 +380,30 @@
 
                 onMounted(() => {
                     isAdmin.value = new URLSearchParams(window.location.search).get('mode') === 'admin';
+                    
                     db.collection("doorsign").doc("settings").onSnapshot(doc => {
                         if (doc.exists) {
-                            state.value = doc.data();
+                            const data = doc.data();
+                            state.value = { ...state.value, ...data };
                             dbConnected.value = true;
                             fetchCalendar();
                         }
                     });
+
                     setInterval(() => now.value = new Date(), 1000);
-                    setInterval(fetchCalendar, 1000);
+                    setInterval(fetchCalendar, 300000);
+                    
+                    fetchWeather();
+                    setInterval(fetchWeather, 900000);
                 });
 
-                return { isAdmin, state, dbConnected, computedStatus, displayClasses, currentStatusText, currentDescriptionText, currentSubText, currentStatusIcon, currentTime, setStatus, triggerAction, saveToFirebase };
+                return { 
+                    isAdmin, state, dbConnected, computedStatus, 
+                    displayClasses, currentStatusText, currentDescriptionText, 
+                    currentSubText, currentStatusIcon, currentTime, 
+                    weather, weatherIcon, isDarkModeActive, wakeLockActive,
+                    setStatus, triggerAction, saveToFirebase, activateWakeLock 
+                };
             }
         }).mount('#app');
     </script>
