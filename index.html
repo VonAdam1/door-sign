@@ -270,19 +270,24 @@
                     const t = now.value.getTime();
                     
                     // 3. Kolla pågående event
-                    const currentEvent = calendarEvents.value.find(e => t >= e.startDate.getTime() && t < e.endDate.getTime());
-                    
-                    if (currentEvent) {
-                        // ** NY LOGIK: Kolla om titeln är "Focus Time" **
-                        // Vi gör om texten till små bokstäver och tar bort mellanslag i kanterna för att vara säkra
-                        const title = (currentEvent.summary || "").toLowerCase().trim();
-                        
-                        if (title === "focus time") {
-                            return 'focus_calendar'; // Detta är vår nya status
-                        }
-                        
-                        return 'busy'; // Annars är det bara vanligt möte
-                    }
+                    // 3. Kolla pågående event
+const currentEvent = calendarEvents.value.find(e => t >= e.startDate.getTime() && t < e.endDate.getTime());
+
+if (currentEvent) {
+    const title = (currentEvent.summary || "").toLowerCase();
+    
+    // Vi kollar efter dina specifika titlar här
+    const shouldShowFocus = title.includes("head of post") || 
+                           title.includes("cto") || 
+                           title.includes("focus") || 
+                           title.includes("fokus");
+
+    if (shouldShowFocus) {
+        return 'focus_calendar'; // Visar din snygga FOCUS-skärm
+    }
+    
+    return 'busy'; // För alla andra möten
+}
                     
                     // 4. Kolla kommande event (inom 10 min)
                     const upcomingEvent = calendarEvents.value.find(e => {
@@ -427,7 +432,7 @@
                     });
 
                     setInterval(() => now.value = new Date(), 1000);
-                    setInterval(fetchCalendar, 3000);
+                    setInterval(fetchCalendar, 60000);
                     
                     fetchWeather();
                     setInterval(fetchWeather, 900000);
