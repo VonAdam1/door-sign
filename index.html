@@ -24,12 +24,14 @@
         @keyframes party-mode { 0% { background-color: #db2777; } 50% { background-color: #9333ea; } 100% { background-color: #db2777; } }
         @keyframes ocean-breeze { 0% { background-color: #0891b2; } 50% { background-color: #0d9488; } 100% { background-color: #0891b2; } }
         @keyframes fever-pulse { 0% { background-color: #65a30d; } 50% { background-color: #3f6212; } 100% { background-color: #65a30d; } }
+        @keyframes focus-breathe { 0% { background-color: #312e81; } 50% { background-color: #4338ca; } 100% { background-color: #312e81; } }
         
         .flow-mode { animation: pulse-glow 3s infinite; }
         .upcoming-mode { animation: pulse-orange 2s infinite; }
         .weekend-bg { animation: party-mode 10s infinite; }
         .vacation-bg { animation: ocean-breeze 8s infinite; }
         .sick-bg { animation: fever-pulse 4s infinite; }
+        .focus-calendar-bg { animation: focus-breathe 6s infinite; }
         
         /* Förhindra markering av text och gummiband-effekt på iOS */
         body { 
@@ -167,11 +169,11 @@
                 <div v-if="!wakeLockActive" class="absolute top-0 left-0 w-full h-full z-[100] cursor-pointer" @click="activateWakeLock" title="Klicka för att aktivera helskärmsläge"></div>
 
                 <div v-if="computedStatus === 'flow' && !isDarkModeActive" class="absolute inset-0 flow-mode pointer-events-none border-[20px] md:border-[30px] border-purple-400/20"></div>
+                <div v-if="computedStatus === 'focus_calendar' && !isDarkModeActive" class="absolute inset-0 focus-calendar-bg pointer-events-none border-[20px] md:border-[30px] border-indigo-400/20"></div>
             </div>
         </div>
 
     </div>
-
     <script>
         const { createApp, ref, computed, onMounted } = Vue;
 
@@ -256,26 +258,51 @@
                     else return nowMinutes >= startMinutes || nowMinutes < endMinutes;
                 });
 
+                // --- STATUS LOGIK (HÄR ÄR ÄNDRINGEN FÖR FOCUS TIME) ---
                 const computedStatus = computed(() => {
+                    // 1. Manuell override går alltid först
                     if (state.value.status !== 'auto') return state.value.status;
+                    
+                    // 2. Helg-check
                     const day = now.value.getDay();
                     if (day === 0 || day === 6) return 'weekend';
+                    
                     const t = now.value.getTime();
+                    
+                    // 3. Kolla pågående event
                     const currentEvent = calendarEvents.value.find(e => t >= e.startDate.getTime() && t < e.endDate.getTime());
-                    if (currentEvent) return 'busy';
+                    
+                    if (currentEvent) {
+                        // ** NY LOGIK: Kolla om titeln är "Focus Time" **
+                        // Vi gör om texten till små bokstäver och tar bort mellanslag i kanterna för att vara säkra
+                        const title = (currentEvent.summary || "").toLowerCase().trim();
+                        
+                        if (title === "focus time") {
+                            return 'focus_calendar'; // Detta är vår nya status
+                        }
+                        
+                        return 'busy'; // Annars är det bara vanligt möte
+                    }
+                    
+                    // 4. Kolla kommande event (inom 10 min)
                     const upcomingEvent = calendarEvents.value.find(e => {
                         const timeUntil = e.startDate.getTime() - t;
                         return timeUntil > 0 && timeUntil <= 600000;
                     });
+                    
                     if (upcomingEvent) return 'upcoming';
+                    
+                    // 5. Annars ledigt
                     return 'free';
                 });
 
+                // --- UI MAPPINGS (FÄRG OCH TEXT) ---
                 const displayClasses = computed(() => {
                     if (isDarkModeActive.value) return 'bg-black text-gray-400';
                     switch (computedStatus.value) {
                         case 'home': return 'bg-indigo-800';
                         case 'busy': return 'bg-red-600';
+                        case 'focus_calendar': return 'bg-indigo-950'; // Mörkare bakgrund för fokusläget
                         case 'upcoming': return 'upcoming-mode';
                         case 'flow': return 'bg-purple-950';
                         case 'lunch': return 'bg-orange-500';
@@ -292,8 +319,9 @@
                     switch (computedStatus.value) {
                         case 'home': return 'HOME';
                         case 'busy': return 'BUSY';
+                        case 'focus_calendar': return 'FOCUS MODE'; // Din nya text
                         case 'upcoming': return 'SOON';
-                        case 'flow': return 'FOCUS';
+                        case 'flow': return 'FOCUS'; // Manuell Focus (knappen)
                         case 'lunch': return 'LUNCH';
                         case 'free': return 'FREE';
                         case 'weekend': return 'WEEKEND';
@@ -307,8 +335,12 @@
                     if (isDarkModeActive.value) return 'Sov gott';
                     if (computedStatus.value === 'home') return "I'm Working from home";
                     if (computedStatus.value === 'busy') return "I'm in a meeting";
+                    
+                    // HÄR ÄR DIN SPECIFIKA TEXT FÖR KALENDER-FOCUS
+                    if (computedStatus.value === 'focus_calendar') return "Please do not disturb unless it is urgent";
+                    
                     if (computedStatus.value === 'upcoming') return "Meeting starts shortly";
-                    if (computedStatus.value === 'flow') return "Deep work in progress";
+                    if (computedStatus.value === 'flow') return "Deep work in progress"; // Text för manuell knapp
                     if (computedStatus.value === 'lunch') return "Out for lunch";
                     if (computedStatus.value === 'weekend') return "What are you doing here?";
                     if (computedStatus.value === 'vacation') return "Off Duty";
@@ -322,9 +354,12 @@
                     if (computedStatus.value === 'weekend') return 'Go home!';
                     if (computedStatus.value === 'vacation') return "Don't call me";
                     if (computedStatus.value === 'sick') return 'Trying to rest';
+                    
+                    // Visa sluttid även för Focus Time
                     const t = now.value.getTime();
                     const current = calendarEvents.value.find(e => t >= e.startDate.getTime() && t < e.endDate.getTime());
                     if (current) return `Ends ${current.endDate.toLocaleTimeString('sv-SE', {hour:'2-digit', minute:'2-digit'})}`;
+                    
                     return '';
                 });
 
@@ -333,6 +368,7 @@
                     switch (computedStatus.value) {
                         case 'home': return 'fas fa-house-laptop';
                         case 'busy': return 'fas fa-door-closed';
+                        case 'focus_calendar': return 'fas fa-brain'; // Hjärn-ikonen för Focus Time
                         case 'upcoming': return 'fas fa-hourglass-half';
                         case 'flow': return 'fas fa-headphones';
                         case 'lunch': return 'fas fa-utensils';
